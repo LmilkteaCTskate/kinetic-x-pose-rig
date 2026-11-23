@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KINETIC-X // 机械工业人体骨骼识别系统</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Top Hazard Stripe -->
+  <div class="hazard-bar"></div>
+
+  <!-- Header Steel Bezel -->
+  <header class="top-bezel">
+    <div class="brand-block">
+      <div class="brand-badge">MK-IV</div>
+      <div class="brand-titles">
+        <h1>KINETIC-X <span class="accent-amber">// POSE RIG</span></h1>
+        <p class="subtitle">BIOMECHANICAL SKELETON TELEMETRY &amp; GPU INFERENCE CONSOLE</p>
+      </div>
+    </div>
+
+    <div class="telemetry-strip">
+      <div class="tele-cell">
+        <span class="tele-label">GPU CORE</span>
+        <span class="tele-val" id="gpu-name">INITIALIZING...</span>
+      </div>
+      <div class="tele-cell vram-cell">
+        <span class="tele-label">VRAM LOAD <span id="vram-text">-- / -- MB</span></span>
+        <div class="vram-track"><div class="vram-fill" id="vram-fill"></div></div>
+      </div>
+      <div class="tele-cell">
+        <span class="tele-label">INFERENCE</span>
+        <span class="tele-val accent-cyan" id="inf-ms">0.0 ms</span>
+      </div>
+      <div class="tele-cell">
+        <span class="tele-label">NET RTT</span>
+        <span class="tele-val" id="rtt-ms">-- ms</span>
+      </div>
+      <div class="tele-cell">
+        <span class="tele-label">THROUGHPUT</span>
+        <span class="tele-val accent-amber" id="fps-val">0.0 FPS</span>
+      </div>
+      <div class="tele-cell status-leds">
+        <div class="led-item"><span class="led" id="led-cuda"></span><span id="compute-mode-label">AUTO</span></div>
+        <div class="led-item"><span class="led" id="led-ws"></span>LINK</div>
+        <div class="led-item"><span class="led" id="led-lock"></span>LOCK</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main 3-Column Industrial Command Deck -->
+  <main class="command-deck">
+    <!-- LEFT RACK: Controls & Actuators -->
+    <aside class="rack rack-left">
+      <!-- Input Mode Panel -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-code">MOD-01</span>
+          <h2>输入源控制 // INPUT SOURCE</h2>
+        </div>
+        <div class="mode-grid">
+          <button class="mode-btn active" data-mode="camera" id="btn-mode-camera">
+            <span class="mode-num">01</span>
+            <span class="mode-name">实时摄像头</span>
+            <span class="mode-sub">LIVE CAM</span>
+          </button>
+          <button class="mode-btn" data-mode="image" id="btn-mode-image">
+            <span class="mode-num">02</span>
+            <span class="mode-name">图像解析</span>
+            <span class="mode-sub">IMAGE SCAN</span>
+          </button>
+          <button class="mode-btn" data-mode="video" id="btn-mode-video">
+            <span class="mode-num">03</span>
+            <span class="mode-name">视频解析</span>
+            <span class="mode-sub">VIDEO FEED</span>
+          </button>
+        </div>
+
+        <!-- Mode-specific controls -->
+        <div class="mode-controls" id="ctrl-camera">
+          <button class="btn-engage" id="btn-cam-toggle">
+            <span class="btn-indicator"></span>
+            <span id="cam-toggle-text">启动光学采集 // ENGAGE CAM</span>
+          </button>
+          <div class="cam-sub-row">
+            <button class="btn-secondary" id="btn-demo-toggle">
+              虚拟机械人测试 // DEMO
+            </button>
+            <button class="btn-secondary" id="btn-flip-cam" title="切换手机/平板前后摄像头">
+              切换镜头 // FLIP
+            </button>
+          </div>
+        </div>
+
+        <div class="mode-controls hidden" id="ctrl-image">
+          <label class="drop-bay" id="image-dropzone" for="input-image">
+            <input type="file" id="input-image" accept="image/*" hidden />
+            <span class="drop-icon">⬡</span>
+            <span class="drop-title">拖放或选择静态图像</span>
+            <span class="drop-sub">JPG / PNG / WEBP</span>
+          </label>
+          <button class="btn-secondary" id="btn-rescan-image" disabled>重新执行骨骼解析 // RE-SCAN</button>
+        </div>
+
+        <div class="mode-controls hidden" id="ctrl-video">
+          <label class="drop-bay" id="video-dropzone" for="input-video">
+            <input type="file" id="input-video" accept="video/*" hidden />
+            <span class="drop-icon">▶</span>
+            <span class="drop-title">载入工业视频流</span>
+            <span class="drop-sub">MP4 / WEBM / MOV</span>
+          </label>
+          <div class="video-transport" id="video-transport">
+            <button class="btn-mini" id="btn-vid-play" disabled>PLAY</button>
+            <input type="range" id="vid-seek" min="0" max="100" value="0" step="0.1" disabled />
+            <select id="vid-speed" class="select-mini" disabled>
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1.0x</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Inference Engine Panel -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-code">ENG-02</span>
+          <h2>识别模块开关 // DETECTORS</h2>
+        </div>
+
+        <!-- Independent Body Skeleton & Hand Recognition Switches -->
+        <div class="module-switch-grid">
+          <button type="button" class="mod-toggle active-amber" id="btn-toggle-pose" aria-pressed="true">
+            <span class="mod-toggle-top">
+              <span class="mod-led"></span>
+              <span class="mod-state" id="pose-state-txt">ON</span>
+            </span>
+            <span class="mod-title">人体骨骼识别</span>
+            <span class="mod-sub">BODY SKELETON</span>
+          </button>
+
+          <button type="button" class="mod-toggle active-cyan" id="btn-toggle-hands" aria-pressed="true">
+            <span class="mod-toggle-top">
+              <span class="mod-led"></span>
+              <span class="mod-state" id="hands-state-txt">ON</span>
+            </span>
+            <span class="mod-title">手部骨骼识别</span>
+            <span class="mod-sub">HAND 21-PT</span>
+          </button>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="engine-select">骨骼模型引擎 POSE ENGINE</label>
+          <select id="engine-select" class="industrial-select">
+            <option value="yolo11n-pose">YOLO11-NANO POSE (CUDA · 17PT)</option>
+            <option value="yolo11s-pose">YOLO11-SMALL POSE (CUDA · 17PT)</option>
+            <option value="mediapipe">MEDIAPIPE POSE (CPU · 33PT)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <div class="field-row">
+            <label class="field-label" for="conf-slider">置信度阈值 CONFIDENCE</label>
+            <span class="field-readout" id="conf-val">0.35</span>
+          </div>
+          <input type="range" id="conf-slider" class="industrial-range" min="0.15" max="0.85" step="0.05" value="0.35" />
+        </div>
+
+        <div class="field-group">
+          <div class="field-row">
+            <label class="field-label" for="imgsz-select">输入张量尺寸 TENSOR SIZE</label>
+            <span class="field-readout accent-cyan" id="hw-tier-badge">AUTO OPT</span>
+          </div>
+          <select id="imgsz-select" class="industrial-select">
+            <option value="320">320px — ULTRA SPEED (CPU/WAN)</option>
+            <option value="480">480px — BALANCED</option>
+            <option value="640" selected>640px — HIGH PRECISION (GPU)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <div class="field-row">
+            <label class="field-label" for="net-profile-select">网络传输模式 NET STREAM</label>
+            <span class="field-readout" id="stream-bw-badge">AUTO</span>
+          </div>
+          <select id="net-profile-select" class="industrial-select">
+            <option value="auto" selected>AUTO — 外网自适应流畅</option>
+            <option value="wan">WAN LITE — 极速省流 (360px)</option>
+            <option value="lan">LAN HQ — 局域网高清 (640px)</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- HUD Layers & Export -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-code">HUD-03</span>
+          <h2>视觉图层 // OVERLAY SWITCHES</h2>
+        </div>
+        <div class="toggle-grid">
+          <label class="switch-row">
+            <input type="checkbox" id="chk-skeleton" checked />
+            <span class="switch-track"></span>
+            <span class="switch-text">机械骨骼连杆 PISTONS</span>
+          </label>
+          <label class="switch-row">
+            <input type="checkbox" id="chk-angles" checked />
+            <span class="switch-track"></span>
+            <span class="switch-text">关节量角弧度 ANGLES</span>
+          </label>
+          <label class="switch-row">
+            <input type="checkbox" id="chk-bbox" checked />
+            <span class="switch-track"></span>
+            <span class="switch-text">目标锁定框 LOCK BOX</span>
+          </label>
+          <label class="switch-row">
+            <input type="checkbox" id="chk-scanlines" checked />
+            <span class="switch-track"></span>
+            <span class="switch-text">CRT 扫描纹理 SCANLINE</span>
+          </label>
+          <label class="switch-row">
+            <input type="checkbox" id="chk-mirror" checked />
+            <span class="switch-track"></span>
+            <span class="switch-text">摄像头镜像 MIRROR</span>
+          </label>
+        </div>
+
+        <div class="export-row">
+          <button class="btn-export" id="btn-snap-png">截屏导出 PNG</button>
+          <button class="btn-export" id="btn-export-json">遥测数据 JSON</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- CENTER VIEWPORT: Optical Telemetry Bay -->
+    <section class="viewport-bay">
+      <div class="viewport-frame">
+        <!-- Corner Hex Rivets -->
+        <span class="rivet tl"></span>
+        <span class="rivet tr"></span>
+        <span class="rivet bl"></span>
+        <span class="rivet br"></span>
+
+        <!-- Top Viewport HUD Strip -->
+        <div class="vp-hud-top">
+          <div class="vp-tag">OPTICAL BAY // CH-01</div>
+          <div class="vp-tag" id="vp-res">0 × 0 PX</div>
+          <div class="vp-tag accent-amber" id="vp-targets">BODY: 00 | HAND: 00</div>
+          <div class="vp-tag" id="vp-clock">00:00:00</div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="canvas-stage" id="canvas-stage">
+          <canvas id="hud-canvas"></canvas>
+          <div class="scanline-overlay" id="scanline-overlay"></div>
+
+          <!-- Idle Standby Overlay -->
+          <div class="standby-overlay" id="standby-overlay">
+            <div class="standby-reticle"></div>
+            <div class="standby-title">OPTICAL FEED STANDBY</div>
+            <div class="standby-sub">点击左侧 [启动光学采集] / [虚拟机械人测试] 或上传图像视频开始骨骼识别</div>
+          </div>
+        </div>
+
+        <!-- Bottom Calibration Ruler -->
+        <div class="vp-hud-bottom">
+          <span>AXIS-X CALIBRATED</span>
+          <span id="vp-engine-badge">CORE: YOLO11N-POSE</span>
+          <span>COORD: NORMALIZED [0.000 - 1.000]</span>
+        </div>
+      </div>
+
+      <!-- Hidden media sources -->
+      <video id="source-video" playsinline muted class="hidden"></video>
+      <canvas id="capture-canvas" class="hidden"></canvas>
+    </section>
+
+    <!-- RIGHT RACK: Kinematics & Wireframe Radar -->
+    <aside class="rack rack-right">
+      <!-- 2D Wireframe Radar -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-code">RAD-04</span>
+          <h2>纯骨骼蓝图 // 2D WIREFRAME</h2>
+          <div class="unit-tabs" id="unit-tabs">
+            <span class="unit-pill active">UNIT-01</span>
+          </div>
+        </div>
+        <div class="radar-wrap">
+          <canvas id="radar-canvas" width="280" height="220"></canvas>
+          <div class="posture-banner">
+            <span class="posture-label">POSTURE STATE</span>
+            <span class="posture-code" id="posture-state">STANDBY</span>
+          </div>
+          <div class="hands-telemetry" id="hands-telemetry">
+            <div class="hand-empty">HAND TELEMETRY // STANDBY</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Biomechanical Joint Angles -->
+      <section class="panel panel-angles">
+        <div class="panel-header">
+          <span class="panel-code">KIN-05</span>
+          <h2>关节角度遥测 // JOINT ANGLES</h2>
+          <span class="integrity-tag" id="integrity-val">INT: 0%</span>
+        </div>
+        <div class="angles-list" id="angles-list">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </section>
+
+      <!-- System Console Log -->
+      <section class="panel panel-console">
+        <div class="panel-header">
+          <span class="panel-code">LOG-06</span>
+          <h2>系统事件终端 // EVENT LOG</h2>
+        </div>
+        <div class="console-body" id="console-log"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

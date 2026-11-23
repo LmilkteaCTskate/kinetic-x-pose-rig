@@ -1,0 +1,41 @@
+services:
+  kinetic-x-cpu:
+    build:
+      context: .
+      args:
+        TORCH_VARIANT: cpu
+    container_name: kinetic-x-cpu
+    ports:
+      - "8000:8000"
+    environment:
+      - KINETIC_DEVICE=auto
+      - KINETIC_HOST=0.0.0.0
+      - KINETIC_PORT=8000
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
+    profiles: ["cpu"]
+
+  kinetic-x-gpu:
+    build:
+      context: .
+      args:
+        TORCH_VARIANT: cu126
+    container_name: kinetic-x-gpu
+    ports:
+      - "8000:8000"
+    environment:
+      - KINETIC_DEVICE=auto
+      - KINETIC_HOST=0.0.0.0
+      - KINETIC_PORT=8000
+    volumes:
+      - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    profiles: ["gpu"]
